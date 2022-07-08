@@ -24,7 +24,7 @@ def get_app() -> FastAPI:
 
     app = FastAPI(
         title="app",
-        description="An API aggregator for gym excercises",
+        description="A simple scaffold for FastAPI projects",
         docs_url=None,
         redoc_url=None,
         openapi_url="/api/openapi.json",
