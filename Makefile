@@ -10,40 +10,81 @@ clean:  ## Remove cache files
 	@find . -name "*.pyo" | xargs rm -rf
 	@find . -name "__pycache__" -type d | xargs rm -rf
 
+
+###
+# Dependencies section
+###
+_base-pip:
+	@pip install -U pip poetry wheel
+
+system-dependencies:
+	@sudo apt-get update -y && sudo apt-get install -y libpq-dev
+
+dev-dependencies: _base-pip  ## Install development dependencies
+	@poetry install
+
+export-requirements: _base-pip
+	@poetry export --without-hashes --dev -f requirements.txt > requirements.txt
+
+ci-dependencies:
+	@pip install -r requirements.txt
+
+dependencies: _base-pip  ## Install dependencies
+	@poetry install --no-dev
+
+outdated:  ## Show outdated packages
+	@poetry show --outdated
+
+
+###
+# Tests section
+###
+test: clean  ## Run tests
+	@pytest --asyncio-mode=auto tests/
+
+test-coverage: clean  ## Run tests with coverage output
+	@pytest --asyncio-mode=auto tests/ --cov app/ --cov-report term-missing --cov-report xml
+
+test-matching: clean  ## Run tests by match ex: make test-matching k=name_of_test
+	@pytest --asyncio-mode=auto -k $(k) tests/
+
+test-security: clean  ## Run security tests with bandit and safety
+	@python -m bandit -r app -x "test"
+	@python -m safety check
+
+
+###
+# Migrations DB section
+###
+migrations:  ## Create named migrations file. Ex: make migrations name=<migration_name>
+	@alembic revision --autogenerate --message $(name)
+
+migrate:  ## Apply local migrations
+	@alembic upgrade head
+
+history:  ## migrations history
+	@alembic history
+
+branches: ## migrations branch point
+	@alembic branches --verbose
+
+merge: ## Create named migrations file from multiplous heads. Ex: make merge m=<migration_name>
+	@alembic merge heads -m ${m}
+
+pre-commit-install:  ## Install pre-commit hooks
+	@pre-commit install
+
+pre-commit-uninstall:  ## Uninstall pre-commit hooks
+	@pre-commit uninstall
+
+
 ###
 # Run local section
 ###
 copy-envs:  ## Copy `.env.example` to `.env`
 	@cp -n .env.example .env
 
-init: dependencies copy-envs ## Initialize project
+init: dev-dependencies pre-commit-install copy-envs ## Initialize project
 
 run-local:  ## Run server
-	@python -m app --reload
-
-###
-# Lint section
-###
-_flake8:
-	@flake8 --show-source app/
-
-_isort:
-	@isort --check-only app/
-
-_black:
-	@black --diff --check app/
-
-_isort-fix:
-	@isort app/ tests/
-
-_black-fix:
-	@black app/ tests/
-
-_dead-fixtures:
-	@pytest app/ --dead-fixtures
-
-_mypy:
-	@mypy app/
-
-lint: _flake8 _isort _black _dead-fixtures  ## Check code lint
-format-code: _isort-fix _black-fix  ## Format code
+	@python -m app
